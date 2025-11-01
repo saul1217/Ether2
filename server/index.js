@@ -15,23 +15,34 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 // Configuración CORS - Permite requests desde otros dominios
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'http://localhost:5173']; // Defaults para desarrollo
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean)
+  : []; // Si no hay configurado, permite todos
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir requests sin origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Si hay origins configurados, verificar
-    if (allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
-      // En desarrollo, permitir cualquier origen (cambiar en producción)
-      if (process.env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      return callback(new Error('No permitido por CORS'));
+    // Permitir requests sin origin (mobile apps, Postman, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
     }
-    callback(null, true);
+    
+    // Si no hay origins configurados o está vacío, permitir todos
+    if (allowedOrigins.length === 0 || !process.env.ALLOWED_ORIGINS) {
+      return callback(null, true);
+    }
+    
+    // Si hay origins configurados, verificar que esté en la lista
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Si está en desarrollo, permitir cualquier origen
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // En producción con origins configurados, rechazar si no está en la lista
+    console.log(`[CORS] Origen rechazado: ${origin}. Permitidos: ${allowedOrigins.join(', ')}`);
+    return callback(new Error('No permitido por CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
