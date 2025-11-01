@@ -18,21 +18,56 @@ Ya está listo. El código permite cualquier origen en desarrollo.
 
 ### Para Producción
 
-Edita `.env` en tu servidor:
+**Ubicación del archivo `.env`:** 
+- Está en la carpeta `server/` → `server/.env`
+- Si no existe, créalo copiando desde `env.example` (que está en la raíz del proyecto)
+
+**Edita `server/.env`:**
 
 ```env
 # Lista de dominios permitidos (separados por comas)
 ALLOWED_ORIGINS=https://tu-pagina.com,https://pagina-de-tu-amigo.com,https://otro-sitio.com
 
-# O deja vacío para permitir todos (menos seguro)
+# O deja vacío para permitir todos (menos seguro, solo en desarrollo)
 # ALLOWED_ORIGINS=
 ```
+
+**Nota:** El archivo `.env` está en `.gitignore` y no se sube al repositorio por seguridad.
 
 ---
 
 ## 📋 Paso 2: Desplegar el Servidor
 
-### Opción A: Railway (Gratis, Fácil) ⭐ Recomendado
+> ⚠️ **Nota:** Railway puede tener limitaciones en planes gratuitos. Si no puedes desplegar, ve a **`DEPLOY_ALTERNATIVAS.md`** para otras opciones gratuitas.
+
+### Opción A: Render.com (Gratis, Sin Limitaciones) ⭐ RECOMENDADO
+
+1. Ve a [render.com](https://render.com)
+2. Sign up con GitHub (gratis)
+3. Click "New +" → "Web Service"
+4. Conecta tu repositorio de GitHub
+5. Configuración:
+   ```
+   Name: ens-auth-api
+   Environment: Node
+   Build Command: cd server && npm install
+   Start Command: cd server && node index.js
+   ```
+6. Agrega variables de entorno en "Environment":
+   ```
+   PORT=10000
+   JWT_SECRET=tu-clave-secreta
+   ETHEREUM_RPC_URL=https://eth.llamarpc.com
+   ALLOWED_ORIGINS=https://tu-pagina.com,https://pagina-amigo.com
+   NODE_ENV=production
+   ```
+7. Click "Create Web Service"
+8. Espera 2-3 minutos
+9. Tu API estará en: `https://ens-auth-api.onrender.com/api`
+
+### Opción B: Railway (Gratis, pero Puede Tener Limitaciones)
+
+⚠️ **Nota:** Railway puede limitar cuentas gratuitas a solo bases de datos. Si ves "Limited Access", usa otra opción.
 
 1. Ve a [railway.app](https://railway.app)
 2. Sign up con GitHub
@@ -48,6 +83,12 @@ ALLOWED_ORIGINS=https://tu-pagina.com,https://pagina-de-tu-amigo.com,https://otr
    ```
 7. Railway te da una URL tipo: `https://tu-proyecto.railway.app`
 8. Tu API estará en: `https://tu-proyecto.railway.app/api`
+
+### 🚀 Más Opciones
+
+Si ninguna de estas funciona, ver:
+- **`GUIA_RENDER.md`** - Guía paso a paso detallada para Render.com
+- **`DEPLOY_ALTERNATIVAS.md`** - Otras opciones (Cyclic.sh, Fly.io, Replit, Vercel, etc.)
 
 ### Opción B: Heroku
 

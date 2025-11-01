@@ -136,6 +136,31 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
   }
 });
 
+// Health check - Para verificar que el servidor está funcionando
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'ENS Authentication API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      nonce: '/api/auth/nonce',
+      login: '/api/auth/ens-login',
+      verify: '/api/auth/verify'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'ENS Authentication API',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Endpoint para verificar token
 app.get('/api/auth/verify', async (req, res) => {
   try {
@@ -170,8 +195,10 @@ app.get('/api/auth/verify', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📝 Endpoints disponibles:`);
-  console.log(`   GET  /api/auth/nonce`);
-  console.log(`   POST /api/auth/ens-login`);
-  console.log(`   GET  /api/auth/verify`);
+  console.log(`   GET  /                      - Información del servicio`);
+  console.log(`   GET  /api/health            - Health check`);
+  console.log(`   GET  /api/auth/nonce        - Obtener nonce`);
+  console.log(`   POST /api/auth/ens-login    - Autenticar con ENS`);
+  console.log(`   GET  /api/auth/verify       - Verificar token`);
 });
 
