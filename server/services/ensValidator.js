@@ -23,7 +23,9 @@ export async function validateENSLogin(ensName, signature, nonce, timestamp) {
     let recoveredAddress;
     try {
       recoveredAddress = ethers.verifyMessage(message, signature);
-      console.log(`[ENS Validator] Dirección recuperada de la firma: ${recoveredAddress}`);
+      // Aplicar checksum correcto (EIP-55) para consistencia
+      recoveredAddress = ethers.getAddress(recoveredAddress);
+      console.log(`[ENS Validator] Dirección recuperada de la firma (checksummed): ${recoveredAddress}`);
     } catch (sigError) {
       return {
         isValid: false,
@@ -38,9 +40,10 @@ export async function validateENSLogin(ensName, signature, nonce, timestamp) {
       // Si no tiene resolver pero la dirección firmó correctamente, permitir el login
       // Esto es para casos donde el ENS existe pero no tiene resolver configurado
       console.log(`[ENS Validator] ENS ${normalizedENS} no tiene resolver, pero la firma es válida`);
+      console.log(`[ENS Validator] Retornando dirección firmante: ${recoveredAddress}`);
       return {
         isValid: true,
-        address: recoveredAddress,
+        address: recoveredAddress, // Dirección que firmó el mensaje
         ensName: normalizedENS
       };
     }
@@ -49,7 +52,10 @@ export async function validateENSLogin(ensName, signature, nonce, timestamp) {
     let resolvedAddress;
     try {
       resolvedAddress = await provider.resolveName(normalizedENS);
-      console.log(`[ENS Validator] Dirección resuelta del ENS: ${resolvedAddress}`);
+      if (resolvedAddress) {
+        resolvedAddress = ethers.getAddress(resolvedAddress); // Checksum
+        console.log(`[ENS Validator] Dirección resuelta del ENS: ${resolvedAddress}`);
+      }
     } catch (error) {
       console.log(`[ENS Validator] No se pudo resolver dirección del ENS: ${error.message}`);
     }
@@ -68,14 +74,18 @@ export async function validateENSLogin(ensName, signature, nonce, timestamp) {
     let ownerAddress;
     try {
       ownerAddress = await ensRegistry.owner(namehash);
-      console.log(`[ENS Validator] Owner del ENS: ${ownerAddress}`);
+      if (ownerAddress && ownerAddress !== ethers.ZeroAddress) {
+        ownerAddress = ethers.getAddress(ownerAddress); // Checksum
+        console.log(`[ENS Validator] Owner del ENS (checksummed): ${ownerAddress}`);
+      }
     } catch (error) {
       console.error(`[ENS Validator] Error obteniendo owner: ${error.message}`);
       // Si no podemos obtener el owner, verificar al menos que la dirección resuelta coincide
       if (resolvedAddress && recoveredAddress.toLowerCase() === resolvedAddress.toLowerCase()) {
+        console.log(`[ENS Validator] Retornando dirección firmante: ${recoveredAddress}`);
         return {
           isValid: true,
-          address: recoveredAddress,
+          address: recoveredAddress, // Siempre la dirección que firmó
           ensName: normalizedENS
         };
       }
@@ -89,9 +99,10 @@ export async function validateENSLogin(ensName, signature, nonce, timestamp) {
       // Si no hay owner pero la dirección resuelta coincide, permitir
       if (resolvedAddress && recoveredAddress.toLowerCase() === resolvedAddress.toLowerCase()) {
         console.log(`[ENS Validator] No hay owner, pero la dirección resuelta coincide`);
+        console.log(`[ENS Validator] Retornando dirección firmante: ${recoveredAddress}`);
         return {
           isValid: true,
-          address: recoveredAddress,
+          address: recoveredAddress, // Siempre la dirección que firmó
           ensName: normalizedENS
         };
       }
@@ -110,9 +121,11 @@ export async function validateENSLogin(ensName, signature, nonce, timestamp) {
 
     if (isOwner || matchesResolved) {
       console.log(`[ENS Validator] Validación exitosa - isOwner: ${isOwner}, matchesResolved: ${matchesResolved}`);
+      console.log(`[ENS Validator] Retornando dirección firmante: ${recoveredAddress}`);
+      console.log(`[ENS Validator] Comparación - Firmante: ${recoveredAddress}, Owner: ${ownerAddress}, Resuelta: ${resolvedAddress || 'N/A'}`);
       return {
         isValid: true,
-        address: recoveredAddress,
+        address: recoveredAddress, // IMPORTANTE: Siempre retornar la dirección que firmó
         ensName: normalizedENS
       };
     }
