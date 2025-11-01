@@ -162,7 +162,7 @@ async function loginWithENS() {
 
     // 6. Enviar login (este SÍ es POST)
     const loginResponse = await fetch('https://ether2-7caz.onrender.com/api/auth/ens-login', {
-      method: 'POST',  // ✅ Este sí es POST
+      +method: 'POST',  // ✅ Este sí es POST
       headers: {
         'Content-Type': 'application/json'
       },
