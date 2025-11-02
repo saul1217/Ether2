@@ -2,14 +2,14 @@
   "name": "ens-auth-module",
   "version": "1.0.0",
   "description": "Módulo de autenticación universal con ENS",
-  "main": "server/index.js",
+  "main": "backend/index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "cd server && nodemon index.js",
-    "dev:client": "cd client && npm run dev",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "start": "cd server && node index.js",
-    "setup": "npm run install:all && cd server && cp env.example .env"
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && nodemon index.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "start": "cd backend && node index.js",
+    "setup": "npm run install:all && cd backend && cp env.example .env"
   },
   "keywords": ["ENS", "Ethereum", "authentication", "Web3"],
   "author": "",

@@ -46,29 +46,45 @@ Si alguien ya tiene el backend desplegado, puedes usar solo el frontend:
 - Usa el componente `LoginWithENSRemote.jsx` o modifica `LoginWithENS.jsx`
 - Ver `API_DOCS.md` para documentación completa de endpoints
 
+## 📁 Estructura del Proyecto
+
+El proyecto está organizado en carpetas separadas:
+
+- **`frontend/`** - Aplicación React (Frontend)
+- **`backend/`** - API Node.js/Express (Backend)
+- **`docs/`** - Documentación del proyecto
+
+Ver `ESTRUCTURA_PROYECTO.md` para más detalles.
+
 ## 🚀 Instalación
 
 1. **Clonar o descargar el proyecto**
 
-2. **Instalar dependencias del servidor:**
+2. **Instalar dependencias del backend:**
 ```bash
-cd server
+cd backend
 npm install
 ```
 
-3. **Instalar dependencias del cliente:**
+3. **Instalar dependencias del frontend:**
 ```bash
-cd ../client
+cd ../frontend
 npm install
 ```
 
 4. **Configurar variables de entorno:**
 ```bash
-cd ../server
-cp .env.example .env
+cd ../backend
+cp env.example .env
 ```
 
-Edita `.env` y ajusta las configuraciones si es necesario.
+Edita `backend/.env` y ajusta las configuraciones si es necesario.
+
+**Nota:** También puedes usar el comando rápido:
+```bash
+npm run setup
+```
+Este comando instala todas las dependencias y crea el archivo `.env` automáticamente.
 
 ## 💻 Uso
 
@@ -83,30 +99,30 @@ npm run dev
 
 O ejecutar por separado:
 
-**Terminal 1 - Servidor:**
+**Terminal 1 - Backend:**
 ```bash
-cd server
+cd backend
 npm run dev
 ```
 
-**Terminal 2 - Cliente:**
+**Terminal 2 - Frontend:**
 ```bash
-cd client
+cd frontend
 npm run dev
 ```
 
-- Servidor: http://localhost:3001
-- Cliente: http://localhost:3000
+- Backend: http://localhost:3001
+- Frontend: http://localhost:3000
 
 ### Producción
 
 ```bash
-# Construir cliente
-cd client
+# Construir frontend
+cd frontend
 npm run build
 
-# Iniciar servidor
-cd ../server
+# Iniciar backend
+cd ../backend
 npm start
 ```
 
