@@ -402,13 +402,16 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
       token,
       user: {
         id: user.id,
-        ensName: user.ensName,
+        ensName: user.ensName,      // Nombre ENS siempre incluido
         address: user.address,
-        balance: ethBalance,   // Balance en ETH
-        balanceUSD: balanceUSD, // Valor en USD
-        avatar: avatar,        // URL del avatar de ENS
+        balance: ethBalance,        // Balance en ETH
+        balanceUSD: balanceUSD,     // Valor en USD
+        avatar: avatar || null,     // URL del avatar de ENS (siempre presente, null si no tiene)
         createdAt: user.createdAt
-      }
+      },
+      // Campos destacados para fácil acceso
+      ensName: user.ensName,
+      avatar: avatar || null
     });
 
   } catch (error) {
@@ -486,13 +489,16 @@ app.get('/api/auth/verify', async (req, res) => {
       valid: true,
       user: {
         id: user.id,
-        ensName: user.ensName,
+        ensName: user.ensName,      // Nombre ENS siempre incluido
         address: user.address,
         balance: ethBalance,
         balanceUSD: balanceUSD,
-        avatar: avatar,
+        avatar: avatar || null,     // URL del avatar de ENS (siempre presente, null si no tiene)
         createdAt: user.createdAt
-      }
+      },
+      // Campos destacados para fácil acceso
+      ensName: user.ensName,
+      avatar: avatar || null
     });
 
   } catch (error) {
