@@ -311,11 +311,44 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
     
     console.log(`[ENS Login] Validando con nonce: ${nonceString.substring(0, 20)}...`);
 
-    // Validar ENS y firma
+    // ESTRATEGIA: Resolver ENS ANTES de validar si es necesario
+    // Si ensName es una dirección, el frontend probablemente envió la dirección del wallet
+    // pero el mensaje fue firmado con el ENS real. Necesitamos resolver el ENS primero.
+    
+    let finalENSName = ensName;
+    
+    // Si ensName es una dirección, intentar resolver el ENS desde esa dirección
+    if (isEthereumAddress(ensName)) {
+      console.log(`[ENS Login] ⚠️ ensName recibido es una dirección: ${ensName}`);
+      console.log(`[ENS Login] Intentando resolver ENS desde esta dirección...`);
+      
+      const resolved = await resolveENSFromAddress(ensName);
+      if (resolved) {
+        finalENSName = resolved;
+        console.log(`[ENS Login] ✅ ENS resuelto desde dirección: ${finalENSName}`);
+      } else {
+        // Si no se puede resolver, el mensaje fue firmado con el ENS real (no la dirección)
+        // Necesitamos intentar validar, pero puede que el mensaje tenga el ENS, no la dirección
+        console.log(`[ENS Login] ⚠️ No se pudo resolver ENS desde dirección ${ensName}`);
+        console.log(`[ENS Login] ⚠️ El mensaje probablemente fue firmado con el ENS real, no con la dirección`);
+        // Continuar con validación - puede fallar si el mensaje tiene el ENS
+      }
+    }
+
+    // Normalizar ENS name si es válido (asegurar que termine en .eth)
+    if (finalENSName && !isEthereumAddress(finalENSName)) {
+      if (!finalENSName.toLowerCase().endsWith('.eth')) {
+        finalENSName = `${finalENSName.toLowerCase()}.eth`;
+      } else {
+        finalENSName = finalENSName.toLowerCase();
+      }
+    }
+
+    // Validar ENS y firma con el ENS final (puede ser el original o el resuelto)
     let validation;
     try {
-      console.log(`[ENS Login] Llamando a validateENSLogin...`);
-      validation = await validateENSLogin(ensName, signature, nonceString, timestampString);
+      console.log(`[ENS Login] Llamando a validateENSLogin con ENS: ${finalENSName}...`);
+      validation = await validateENSLogin(finalENSName, signature, nonceString, timestampString);
       console.log(`[ENS Login] Resultado de validación:`, {
         isValid: validation.isValid,
         error: validation.error || 'N/A',
@@ -330,30 +363,41 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
     }
     
     if (!validation.isValid) {
-      return res.status(401).json({ error: validation.error });
-    }
-
-    // Intentar resolver ENS si aún no lo tenemos o si es una dirección
-    let finalENSName = ensName;
-    if (!ensName || isEthereumAddress(ensName)) {
-      console.log(`[ENS Login] Intentando resolver ENS desde dirección: ${validation.address}`);
-      const resolved = await resolveENSFromAddress(validation.address);
-      if (resolved) {
-        finalENSName = resolved;
-        console.log(`[ENS Login] ✅ ENS resuelto: ${finalENSName}`);
+      // Si la validación falló y ensName original era una dirección,
+      // intentar resolver el ENS desde la dirección validada (de la firma)
+      if (isEthereumAddress(ensName) && validation.address) {
+        console.log(`[ENS Login] ⚠️ Validación falló. Intentando resolver ENS desde dirección validada: ${validation.address}`);
+        const resolvedFromValidated = await resolveENSFromAddress(validation.address);
+        if (resolvedFromValidated) {
+          console.log(`[ENS Login] ✅ ENS encontrado: ${resolvedFromValidated}. Reintentando validación...`);
+          // Reintentar validación con el ENS resuelto
+          const retryValidation = await validateENSLogin(resolvedFromValidated, signature, nonceString, timestampString);
+          if (retryValidation.isValid) {
+            validation = retryValidation;
+            finalENSName = resolvedFromValidated;
+            console.log(`[ENS Login] ✅ Validación exitosa con ENS resuelto: ${finalENSName}`);
+          } else {
+            return res.status(401).json({ error: validation.error });
+          }
+        } else {
+          return res.status(401).json({ error: validation.error });
+        }
       } else {
-        // Si no hay ENS, usar la dirección como fallback pero marcada
-        console.log(`[ENS Login] ⚠️ No hay ENS asociado. Usando dirección: ${validation.address}`);
-        finalENSName = validation.address;
+        return res.status(401).json({ error: validation.error });
       }
     }
 
-    // Normalizar ENS name si es válido
-    if (finalENSName && !isEthereumAddress(finalENSName)) {
-      if (!finalENSName.toLowerCase().endsWith('.eth')) {
-        finalENSName = `${finalENSName.toLowerCase()}.eth`;
+    // Si después de validar, el ENS todavía es una dirección o no se resolvió correctamente,
+    // intentar resolver desde la dirección validada (la que firmó el mensaje)
+    if (isEthereumAddress(finalENSName) || (finalENSName === ensName && isEthereumAddress(ensName))) {
+      console.log(`[ENS Login] Después de validar, intentando resolver ENS desde dirección validada: ${validation.address}`);
+      const resolved = await resolveENSFromAddress(validation.address);
+      if (resolved) {
+        finalENSName = resolved;
+        console.log(`[ENS Login] ✅ ENS resuelto después de validar: ${finalENSName}`);
       } else {
-        finalENSName = finalENSName.toLowerCase();
+        console.log(`[ENS Login] ⚠️ No hay ENS asociado a la dirección validada. Usando dirección: ${validation.address}`);
+        finalENSName = validation.address;
       }
     }
 
