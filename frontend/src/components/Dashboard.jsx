@@ -1,29 +1,72 @@
 import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
+import { useAccount, useEnsName, useEnsAvatar, useBalance } from 'wagmi';
+import { formatEther } from 'viem';
 import './Dashboard.css';
 
 const Dashboard = ({ user, onLogout }) => {
+  // Hooks de wagmi para obtener datos de la wallet conectada
+  const { address: connectedAddress } = useAccount();
+  const { data: wagmiENSName } = useEnsName({ 
+    address: connectedAddress || undefined, 
+    chainId: 1 
+  });
+  const { data: wagmiAvatar } = useEnsAvatar({ 
+    name: wagmiENSName || undefined, 
+    chainId: 1 
+  });
+  const { data: balanceData } = useBalance({
+    address: connectedAddress || undefined,
+  });
+
   // Debug: ver qué datos recibe el componente
   console.log('[Dashboard] User recibido:', user);
   console.log('[Dashboard] User.balance:', user.balance);
   console.log('[Dashboard] User.balanceUSD:', user.balanceUSD);
+  console.log('[Dashboard] Wagmi - Address:', connectedAddress);
+  console.log('[Dashboard] Wagmi - ENS Name:', wagmiENSName);
+  console.log('[Dashboard] Wagmi - Avatar:', wagmiAvatar);
+  console.log('[Dashboard] Wagmi - Balance:', balanceData);
   
-  const [balance, setBalance] = useState(user.balance || null);
-  const [balanceUSD, setBalanceUSD] = useState(user.balanceUSD !== undefined ? user.balanceUSD : null);
-  const [avatar, setAvatar] = useState(user.avatar || null);
+  // Preferir datos de wagmi si están disponibles, sino usar datos del backend
+  const finalENSName = wagmiENSName || user?.ensName || null;
+  const finalAvatar = wagmiAvatar || user?.avatar || null;
+  const finalAddress = connectedAddress || user?.address || null;
+  
+  const [balance, setBalance] = useState(
+    balanceData ? formatEther(balanceData.value) : (user?.balance || null)
+  );
+  const [balanceUSD, setBalanceUSD] = useState(user?.balanceUSD !== undefined ? user.balanceUSD : null);
   const [avatarError, setAvatarError] = useState(false);
+
+  // Función auxiliar para calcular USD de un balance específico
+  const calculateUSDForBalance = async (balanceValue) => {
+    if (balanceValue && (!balanceUSD || balanceUSD === null)) {
+      try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+        const data = await response.json();
+        if (data.ethereum && data.ethereum.usd) {
+          const ethPrice = data.ethereum.usd;
+          const usdValue = balanceValue * ethPrice;
+          setBalanceUSD(usdValue);
+          console.log('[Dashboard] Balance USD calculado desde wagmi:', usdValue);
+        }
+      } catch (error) {
+        console.error('Error obteniendo precio de ETH:', error);
+      }
+    }
+  };
 
   // Obtener balance actualizado si no está disponible
   useEffect(() => {
     // Si ya tenemos balanceUSD del backend, usarlo
-    if (user.balanceUSD !== undefined && user.balanceUSD !== null) {
+    if (user?.balanceUSD !== undefined && user?.balanceUSD !== null) {
       setBalanceUSD(user.balanceUSD);
       console.log('[Dashboard] Balance USD del backend:', user.balanceUSD);
     }
     
     // Si tenemos balance pero no USD, calcularlo
     const calculateUSD = async () => {
-      const currentBalance = balance || user.balance;
+      const currentBalance = balance || user?.balance;
       if (currentBalance && (!balanceUSD || balanceUSD === null)) {
         try {
           const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
@@ -41,40 +84,27 @@ const Dashboard = ({ user, onLogout }) => {
       }
     };
     
-    // Si no tenemos balance, obtenerlo
-    const fetchBalance = async () => {
-      if (!balance && user.address) {
-        try {
-          const provider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
-          const balanceWei = await provider.getBalance(user.address);
-          const balanceETH = ethers.formatEther(balanceWei);
-          const balanceValue = parseFloat(balanceETH);
-          setBalance(balanceValue.toFixed(4));
-          
-          // Calcular USD inmediatamente
-          try {
-            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-            const data = await response.json();
-            if (data.ethereum && data.ethereum.usd) {
-              const ethPrice = data.ethereum.usd;
-              const usdValue = balanceValue * ethPrice;
-              setBalanceUSD(usdValue);
-              console.log('[Dashboard] Balance y USD obtenidos:', balanceValue, usdValue);
-            }
-          } catch (error) {
-            console.error('Error obteniendo precio de ETH:', error);
-          }
-        } catch (error) {
-          console.error('Error obteniendo balance:', error);
-        }
-      } else {
-        // Si ya tenemos balance, solo calcular USD si no lo tenemos
+    // Si tenemos balance de wagmi, usarlo (prioridad)
+    if (balanceData) {
+      const balanceETH = formatEther(balanceData.value);
+      const balanceValue = parseFloat(balanceETH);
+      setBalance(balanceValue.toFixed(4));
+      console.log('[Dashboard] Balance obtenido de wagmi:', balanceValue);
+      
+      // Calcular USD
+      calculateUSDForBalance(balanceValue);
+    } else if (!balance && (user?.balance || finalAddress)) {
+      // Si no hay balance de wagmi pero tenemos datos del backend, usarlos
+      if (user?.balance) {
+        setBalance(user.balance);
         calculateUSD();
+        console.log('[Dashboard] Balance obtenido del backend:', user.balance);
       }
-    };
-
-    fetchBalance();
-  }, [balance, balanceUSD, user.balance, user.balanceUSD, user.address]);
+    } else if (balance) {
+      // Si ya tenemos balance, solo calcular USD si no lo tenemos
+      calculateUSD();
+    }
+  }, [balance, balanceUSD, user?.balance, user?.balanceUSD, balanceData, finalAddress]);
 
   // Formatear balance para mostrar
   const formatBalance = (bal) => {
@@ -102,24 +132,24 @@ const Dashboard = ({ user, onLogout }) => {
 
         <div className="user-info">
           <div className="user-avatar-container">
-            {avatar && !avatarError ? (
+            {finalAvatar && !avatarError ? (
               <img 
-                src={avatar} 
-                alt={`Avatar de ${user.ensName}`}
+                src={finalAvatar} 
+                alt={`Avatar de ${finalENSName || finalAddress}`}
                 className="user-avatar-img"
                 onError={handleAvatarError}
               />
             ) : (
               <div className="user-avatar">
-                <span>{user.ensName.charAt(0).toUpperCase()}</span>
+                <span>{(finalENSName || finalAddress || '?').charAt(0).toUpperCase()}</span>
               </div>
             )}
           </div>
           
           <div className="user-details">
-            <h2 className="user-ens">{user.ensName}</h2>
+            <h2 className="user-ens">{finalENSName || 'Sin ENS'}</h2>
             <p className="user-address">
-              <strong>Dirección:</strong> {user.address}
+              <strong>Dirección:</strong> {finalAddress || user?.address || 'N/A'}
             </p>
             {(balance !== null || user.balance) && (
               <div className="user-balance-container">
@@ -186,11 +216,16 @@ const Dashboard = ({ user, onLogout }) => {
               <strong>User ID:</strong> {user.id}
             </div>
             <div>
-              <strong>ENS Name:</strong> {user.ensName}
+              <strong>ENS Name:</strong> {finalENSName || user?.ensName || 'N/A'}
             </div>
             <div>
-              <strong>Wallet Address:</strong> {user.address}
+              <strong>Wallet Address:</strong> {finalAddress || user?.address || 'N/A'}
             </div>
+            {connectedAddress && (
+              <div>
+                <strong>Wagmi Connected:</strong> ✅ {connectedAddress}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -199,4 +234,5 @@ const Dashboard = ({ user, onLogout }) => {
 };
 
 export default Dashboard;
+
 

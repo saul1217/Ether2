@@ -12,7 +12,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production-' + Date.now();
+const JWT_SECRET = process.env.JWT_SECRET || 'XCEELTQc0mYtxRb2COlrEH2BxA74ZJd9n0FglIewzNc=' + Date.now();
 
 // Advertencia si no hay JWT_SECRET configurado
 if (!process.env.JWT_SECRET) {

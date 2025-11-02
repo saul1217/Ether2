@@ -414,6 +414,15 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
         ensNameEsDireccion: isEthereumAddress(user.ensName)
       });
       
+      // Si el usuario existía y tenía valores incorrectos, actualizar
+      // IMPORTANTE: Asegurar que user.address sea validation.address (la que firmó)
+      if (user.address.toLowerCase() !== validation.address.toLowerCase()) {
+        console.log(`[ENS Login] ⚠️ Dirección del usuario no coincide. Actualizando:`);
+        console.log(`  - Antes: ${user.address}`);
+        console.log(`  - Después: ${validation.address}`);
+        user.address = ethers.getAddress(validation.address); // Checksum
+      }
+      
       // Si el usuario existía y tenía una dirección como ensName, pero ahora tenemos el ENS resuelto,
       // actualizar el usuario con el ENS real
       if (isEthereumAddress(user.ensName) && !isEthereumAddress(finalENSName)) {
@@ -487,24 +496,32 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
       });
     }
 
-    // Asegurar que estamos usando el ENS resuelto, no el user.ensName original
-    // (user.ensName puede ser una dirección si el usuario ya existía con dirección)
-    const finalENSForResponse = finalENSName || user.ensName;
+    // Asegurar que estamos usando el ENS resuelto y la dirección correcta
+    // IMPORTANTE: validation.address es la dirección que firmó el mensaje (la correcta)
+    // finalENSName es el ENS resuelto (o dirección si no hay ENS)
+    const finalENSForResponse = (!isEthereumAddress(finalENSName)) ? finalENSName : null;
+    const finalAddressForResponse = validation.address; // Siempre usar la dirección que firmó
+    
+    console.log(`[ENS Login] 📤 Preparando respuesta:`);
+    console.log(`  - ENS final: ${finalENSForResponse || '(null, no hay ENS)'}`);
+    console.log(`  - Address final: ${finalAddressForResponse}`);
+    console.log(`  - user.ensName actual: ${user.ensName}`);
+    console.log(`  - user.address actual: ${user.address}`);
     
     res.json({
       success: true,
       token,
       user: {
         id: user.id,
-        ensName: finalENSForResponse,      // Nombre ENS real (resuelto, no dirección)
-        address: user.address,
+        ensName: finalENSForResponse,      // ENS name real (null si no hay, NO dirección)
+        address: finalAddressForResponse,  // Dirección que firmó (validation.address)
         balance: ethBalance,        // Balance en ETH
         balanceUSD: balanceUSD,     // Valor en USD
         avatar: avatar || null,     // URL del avatar de ENS (siempre presente, null si no tiene)
         createdAt: user.createdAt
       },
       // Campos destacados para fácil acceso
-      ensName: finalENSForResponse,        // Usar el ENS resuelto
+      ensName: finalENSForResponse,        // Usar el ENS resuelto (o null)
       avatar: avatar || null
     });
 
@@ -575,8 +592,15 @@ app.get('/api/auth/verify', async (req, res) => {
           console.log(`[Verify] Usuario actualizado con ENS resuelto`);
         }
       } else {
-        console.log(`[Verify] ⚠️ No se pudo resolver ENS, usando dirección: ${user.ensName}`);
+        console.log(`[Verify] ⚠️ No se pudo resolver ENS, será null`);
+        finalENSName = null; // Si no hay ENS, devolver null, no dirección
       }
+    }
+    
+    // Asegurar que finalENSName no sea una dirección
+    if (isEthereumAddress(finalENSName)) {
+      finalENSName = null;
+      console.log(`[Verify] ⚠️ finalENSName es dirección, estableciendo a null`);
     }
 
     // Obtener información actualizada: balance y avatar
@@ -604,19 +628,27 @@ app.get('/api/auth/verify', async (req, res) => {
       avatar = null;
     }
 
+    // Asegurar que ensName no sea una dirección
+    const finalENSForResponse = (!isEthereumAddress(finalENSName) && finalENSName) ? finalENSName : null;
+    const finalAddressForResponse = user.address; // La dirección del usuario guardada
+    
+    console.log(`[Verify] 📤 Preparando respuesta:`);
+    console.log(`  - ENS final: ${finalENSForResponse || '(null, no hay ENS)'}`);
+    console.log(`  - Address final: ${finalAddressForResponse}`);
+    
     res.json({
       valid: true,
       user: {
         id: user.id,
-        ensName: finalENSName,      // Nombre ENS real (resuelto si era dirección)
-        address: user.address,
+        ensName: finalENSForResponse,      // ENS name real (null si no hay, NO dirección)
+        address: finalAddressForResponse,  // Dirección del usuario
         balance: ethBalance,
         balanceUSD: balanceUSD,
         avatar: avatar || null,     // URL del avatar de ENS (siempre presente, null si no tiene)
         createdAt: user.createdAt
       },
       // Campos destacados para fácil acceso
-      ensName: finalENSName,        // Usar el ENS resuelto
+      ensName: finalENSForResponse,        // Usar el ENS resuelto (o null)
       avatar: avatar || null
     });
 

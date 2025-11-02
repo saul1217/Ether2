@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ethers } from 'ethers';
+import { useAccount, useEnsName, useConnect, useSignMessage } from 'wagmi';
 import './LoginWithENS.css';
 
 const LoginWithENS = ({ onLoginSuccess }) => {
@@ -7,24 +7,32 @@ const LoginWithENS = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Hooks de wagmi para obtener datos de la wallet
+  const { address, isConnected } = useAccount();
+  const { data: resolvedENSName } = useEnsName({ 
+    address: address || undefined, 
+    chainId: 1 
+  });
+  const { connect, connectors, isPending: isConnecting } = useConnect();
+  const { signMessageAsync, isPending: isSigning } = useSignMessage();
+
+  // Función para conectar wallet
   const checkWalletConnection = async () => {
-    if (!window.ethereum) {
-      throw new Error(
-        'No se detectó una wallet. Por favor, instala MetaMask u otra wallet compatible.'
+    if (!isConnected) {
+      // Intentar conectar con el primer conector disponible (MetaMask, Injected, etc.)
+      const metaMaskConnector = connectors.find(
+        connector => connector.id === 'metaMask' || connector.id === 'injected'
       );
-    }
-
-    // Solicitar acceso a la cuenta
-    await window.ethereum.request({ method: 'eth_requestAccounts' });
-  };
-
-  const getENSFromAddress = async (address) => {
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const resolvedName = await provider.lookupAddress(address);
-      return resolvedName;
-    } catch (error) {
-      return null;
+      
+      if (metaMaskConnector) {
+        await connect({ connector: metaMaskConnector });
+        // Esperar un momento para que la conexión se complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } else {
+        throw new Error(
+          'No se detectó una wallet. Por favor, instala MetaMask u otra wallet compatible.'
+        );
+      }
     }
   };
 
@@ -36,16 +44,18 @@ const LoginWithENS = ({ onLoginSuccess }) => {
       // Verificar conexión de wallet
       await checkWalletConnection();
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const address = await signer.getAddress();
+      // Si no hay wallet conectada después de intentar conectar, lanzar error
+      if (!isConnected || !address) {
+        throw new Error(
+          'Por favor, conecta tu wallet primero'
+        );
+      }
 
-      // Si el usuario no proporcionó un ENS, intentar resolver desde la dirección
+      // Si el usuario no proporcionó un ENS, usar el resuelto por wagmi
       let finalENS = ensName.trim();
       if (!finalENS) {
-        const resolvedENS = await getENSFromAddress(address);
-        if (resolvedENS) {
-          finalENS = resolvedENS;
+        if (resolvedENSName) {
+          finalENS = resolvedENSName;
         } else {
           throw new Error(
             'Por favor, ingresa tu nombre ENS o conecta una wallet asociada a un ENS'
@@ -144,9 +154,10 @@ const LoginWithENS = ({ onLoginSuccess }) => {
       const message = `Autenticación ENS\n\nNombre: ${finalENS}\nNonce: ${nonceString}\nTimestamp: ${timestampString}`;
 
       console.log('[Login] Mensaje a firmar:', message);
+      console.log('[Login] Usando wagmi useSignMessage hook');
 
-      // Solicitar firma al usuario
-      const signature = await signer.signMessage(message);
+      // Solicitar firma al usuario usando wagmi
+      const signature = await signMessageAsync({ message });
       
       console.log('[Login] Firma obtenida:', signature);
 
@@ -208,13 +219,13 @@ const LoginWithENS = ({ onLoginSuccess }) => {
 
       <button
         onClick={handleLogin}
-        disabled={loading}
+        disabled={loading || isConnecting || isSigning}
         className="ens-login-button"
       >
-        {loading ? (
+        {(loading || isConnecting || isSigning) ? (
           <span className="button-loading">
             <span className="spinner"></span>
-            Autenticando...
+            {isConnecting ? 'Conectando...' : isSigning ? 'Firmando...' : 'Autenticando...'}
           </span>
         ) : (
           '🔐 Iniciar Sesión con ENS'
