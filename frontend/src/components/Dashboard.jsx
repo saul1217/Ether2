@@ -174,12 +174,17 @@ const Dashboard = ({ user, onLogout }) => {
             )}
             <p className="user-created">
               <strong>Miembro desde:</strong>{' '}
-              {new Date(user.createdAt).toLocaleDateString('es-ES', {
+              {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('es-ES', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
-              })}
+              }) : 'N/A'}
             </p>
+            {connectedAddress && (
+              <p className="wagmi-status">
+                <strong>Estado Wagmi:</strong> ✅ Conectado en tiempo real
+              </p>
+            )}
           </div>
         </div>
 
@@ -187,16 +192,17 @@ const Dashboard = ({ user, onLogout }) => {
           <div className="feature-card">
             <h3>🔐 Autenticación Segura</h3>
             <p>
-              Has iniciado sesión usando tu nombre ENS y una firma criptográfica.
-              No se requiere contraseña ni terceros.
+              Has iniciado sesión usando tu nombre ENS ({finalENSName || 'resuelto automáticamente'}) 
+              y una firma criptográfica con Wagmi. No se requiere contraseña ni terceros.
             </p>
           </div>
 
           <div className="feature-card">
-            <h3>🌐 Web3 Native</h3>
+            <h3>🌐 Web3 Native con Wagmi</h3>
             <p>
-              Tu identidad está vinculada directamente a la blockchain,
-              dándote control total sobre tu cuenta.
+              Tu identidad está vinculada directamente a la blockchain. 
+              Los datos se obtienen en tiempo real usando hooks de Wagmi 
+              (useAccount, useEnsName, useEnsAvatar, useBalance).
             </p>
           </div>
 
@@ -204,7 +210,7 @@ const Dashboard = ({ user, onLogout }) => {
             <h3>🚀 Sin Centralización</h3>
             <p>
               No dependes de Google, Twitter u otros servicios centralizados
-              para autenticarte.
+              para autenticarte. Wagmi maneja toda la conexión con tu wallet.
             </p>
           </div>
         </div>
@@ -224,6 +230,16 @@ const Dashboard = ({ user, onLogout }) => {
             {connectedAddress && (
               <div>
                 <strong>Wagmi Connected:</strong> ✅ {connectedAddress}
+                {wagmiENSName && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <strong>ENS (Wagmi):</strong> {wagmiENSName}
+                  </div>
+                )}
+                {balanceData && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <strong>Balance (Wagmi):</strong> {formatBalance(formatEther(balanceData.value))} ETH
+                  </div>
+                )}
               </div>
             )}
           </div>

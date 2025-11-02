@@ -137,3 +137,18 @@
   font-weight: bold;
 }
 
+.connection-status {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #e8f5e9;
+  border: 1px solid #4caf50;
+  border-radius: 8px;
+}
+
+.connection-status p {
+  margin: 4px 0;
+  color: #2e7d32;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+

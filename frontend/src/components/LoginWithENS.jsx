@@ -213,7 +213,9 @@ const LoginWithENS = ({ onLoginSuccess }) => {
           className="ens-input"
         />
         <p className="input-hint">
-          Si tienes un ENS asociado a tu wallet, puedes dejarlo vacío
+          {resolvedENSName 
+            ? `ENS detectado: ${resolvedENSName}` 
+            : 'Si tienes un ENS asociado a tu wallet, puedes dejarlo vacío. Wagmi lo resolverá automáticamente.'}
         </p>
       </div>
 
@@ -237,10 +239,19 @@ const LoginWithENS = ({ onLoginSuccess }) => {
       <div className="info-box">
         <h3>¿Cómo funciona?</h3>
         <ul>
-          <li>Conecta tu wallet (MetaMask, WalletConnect, etc.)</li>
-          <li>Firma un mensaje para probar la propiedad de tu ENS</li>
+          <li>Conecta tu wallet usando Wagmi (MetaMask, WalletConnect, etc.)</li>
+          <li>Wagmi resuelve automáticamente tu ENS desde tu dirección</li>
+          <li>Firma un mensaje usando useSignMessage para probar la propiedad</li>
           <li>Inicia sesión sin contraseñas ni terceros</li>
         </ul>
+        {isConnected && address && (
+          <div className="connection-status">
+            <p>✅ Wallet conectada: {address.substring(0, 6)}...{address.substring(address.length - 4)}</p>
+            {resolvedENSName && (
+              <p>✅ ENS resuelto: {resolvedENSName}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
