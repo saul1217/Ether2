@@ -404,9 +404,22 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
     // Crear o obtener usuario
     let user;
     try {
-      console.log(`[ENS Login] Creando/obteniendo usuario...`);
+      console.log(`[ENS Login] Creando/obteniendo usuario con ENS: ${finalENSName}...`);
       user = await createOrGetUser(finalENSName, validation.address);
-      console.log(`[ENS Login] Usuario:`, { id: user.id, ensName: user.ensName, address: user.address });
+      console.log(`[ENS Login] Usuario:`, { 
+        id: user.id, 
+        ensName: user.ensName, 
+        address: user.address,
+        finalENSName: finalENSName,
+        ensNameEsDireccion: isEthereumAddress(user.ensName)
+      });
+      
+      // Si el usuario existía y tenía una dirección como ensName, pero ahora tenemos el ENS resuelto,
+      // actualizar el usuario con el ENS real
+      if (isEthereumAddress(user.ensName) && !isEthereumAddress(finalENSName)) {
+        console.log(`[ENS Login] ⚠️ Usuario existía con dirección como ensName. Actualizando a ENS: ${finalENSName}`);
+        user.ensName = finalENSName;
+      }
     } catch (userError) {
       console.error(`[ENS Login] ❌ Error creando/obteniendo usuario:`, userError);
       return res.status(500).json({ 
@@ -434,12 +447,12 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
     }
 
     try {
-      // Solo intentar obtener avatar si tenemos un ENS name válido (no una dirección)
-      if (user.ensName && !isEthereumAddress(user.ensName)) {
-        avatar = await getENSAvatar(user.ensName);
+      // Usar el ENS resuelto (finalENSName) para obtener avatar, no user.ensName
+      if (finalENSName && !isEthereumAddress(finalENSName)) {
+        avatar = await getENSAvatar(finalENSName);
         console.log(`[ENS Login] Avatar: ${avatar || 'No disponible'}`);
       } else {
-        console.log(`[ENS Login] ⚠️ No hay ENS name válido para obtener avatar`);
+        console.log(`[ENS Login] ⚠️ No hay ENS name válido para obtener avatar (finalENSName: ${finalENSName})`);
         avatar = null;
       }
     } catch (avatarError) {
@@ -454,9 +467,11 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
         throw new Error('JWT_SECRET no está configurado');
       }
       console.log(`[ENS Login] Generando JWT...`);
+      // Usar el ENS resuelto en el JWT, no user.ensName (que puede ser dirección)
+      const ensForJWT = finalENSName || user.ensName;
       token = jwt.sign(
         { 
-          ensName: user.ensName, 
+          ensName: ensForJWT, 
           address: user.address,
           userId: user.id 
         },
@@ -472,12 +487,16 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
       });
     }
 
+    // Asegurar que estamos usando el ENS resuelto, no el user.ensName original
+    // (user.ensName puede ser una dirección si el usuario ya existía con dirección)
+    const finalENSForResponse = finalENSName || user.ensName;
+    
     res.json({
       success: true,
       token,
       user: {
         id: user.id,
-        ensName: user.ensName,      // Nombre ENS siempre incluido
+        ensName: finalENSForResponse,      // Nombre ENS real (resuelto, no dirección)
         address: user.address,
         balance: ethBalance,        // Balance en ETH
         balanceUSD: balanceUSD,     // Valor en USD
@@ -485,7 +504,7 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
         createdAt: user.createdAt
       },
       // Campos destacados para fácil acceso
-      ensName: user.ensName,
+      ensName: finalENSForResponse,        // Usar el ENS resuelto
       avatar: avatar || null
     });
 
