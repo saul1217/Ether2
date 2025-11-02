@@ -25,35 +25,48 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean)
   : []; // Si no hay configurado, permite todos
 
+// Configuración CORS mejorada
 app.use(cors({
   origin: function (origin, callback) {
+    // Log para debugging
+    console.log(`[CORS] Request desde origin: ${origin || 'sin origin'}`);
+    console.log(`[CORS] ALLOWED_ORIGINS configurado: ${process.env.ALLOWED_ORIGINS || 'vacío'}`);
+    console.log(`[CORS] allowedOrigins array:`, allowedOrigins);
+    
     // Permitir requests sin origin (mobile apps, Postman, curl, etc.)
     if (!origin) {
+      console.log(`[CORS] ✅ Permitido (sin origin)`);
       return callback(null, true);
     }
     
     // Si no hay origins configurados, está vacío, o contiene '*', permitir todos
-    if (allowedOrigins.length === 0 || !process.env.ALLOWED_ORIGINS || allowedOrigins.includes('*')) {
+    if (!process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS.trim() === '' || allowedOrigins.includes('*')) {
+      console.log(`[CORS] ✅ Permitido (ALLOWED_ORIGINS vacío o contiene '*')`);
       return callback(null, true);
     }
     
     // Si hay origins configurados, verificar que esté en la lista
     if (allowedOrigins.includes(origin)) {
+      console.log(`[CORS] ✅ Permitido (está en la lista)`);
       return callback(null, true);
     }
     
     // Si está en desarrollo, permitir cualquier origen
     if (process.env.NODE_ENV === 'development') {
+      console.log(`[CORS] ✅ Permitido (modo desarrollo)`);
       return callback(null, true);
     }
     
     // En producción con origins configurados, rechazar si no está en la lista
-    console.log(`[CORS] Origen rechazado: ${origin}. Permitidos: ${allowedOrigins.join(', ')}`);
+    console.log(`[CORS] ❌ Origen rechazado: ${origin}`);
+    console.log(`[CORS] Permitidos: ${allowedOrigins.join(', ')}`);
     return callback(new Error('No permitido por CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+  methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  exposedHeaders: ['Content-Type'],
+  optionsSuccessStatus: 200 // Para navegadores antiguos
 }));
 
 app.use(express.json());
@@ -487,6 +500,46 @@ app.get('/api/auth/verify', async (req, res) => {
   }
 });
 
+// Middleware de manejo de errores global (debe ir ANTES de app.listen)
+app.use((err, req, res, next) => {
+  console.error('❌ Error no manejado:', err);
+  console.error('  - Mensaje:', err.message);
+  console.error('  - Stack:', err.stack);
+  console.error('  - URL:', req.url);
+  console.error('  - Method:', req.method);
+  
+  // Si es error de CORS, devolver 403 en lugar de 500
+  if (err.message === 'No permitido por CORS') {
+    return res.status(403).json({
+      error: 'No permitido por CORS',
+      message: `El origen ${req.headers.origin || 'desconocido'} no está permitido.`,
+      allowedOrigins: process.env.ALLOWED_ORIGINS || '*'
+    });
+  }
+  
+  // Error genérico
+  res.status(err.status || 500).json({
+    error: err.message || 'Error interno del servidor',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+// Manejar rutas no encontradas
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint no encontrado',
+    path: req.path,
+    method: req.method,
+    availableEndpoints: [
+      'GET /',
+      'GET /api/health',
+      'GET /api/auth/nonce',
+      'POST /api/auth/ens-login',
+      'GET /api/auth/verify'
+    ]
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📝 Endpoints disponibles:`);
@@ -495,5 +548,9 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/auth/nonce        - Obtener nonce`);
   console.log(`   POST /api/auth/ens-login    - Autenticar con ENS`);
   console.log(`   GET  /api/auth/verify       - Verificar token`);
+  console.log(`\n🔧 Configuración:`);
+  console.log(`   - NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`   - ALLOWED_ORIGINS: ${process.env.ALLOWED_ORIGINS || 'vacío (permite todos)'}`);
+  console.log(`   - CORS: ${process.env.ALLOWED_ORIGINS === '*' ? 'Permite todos' : 'Configurado'}`);
 });
 
