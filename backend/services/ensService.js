@@ -130,12 +130,18 @@ function checkUrlExists(urlString) {
 }
 
 /**
- * Obtiene el avatar de ENS de un nombre ENS
- * @param {string} ensName - Nombre ENS (ej: "saul12.eth")
+ * Obtiene el avatar de ENS de un nombre ENS o dirección
+ * @param {string} ensName - Nombre ENS (ej: "saul12.eth") o dirección Ethereum
  * @returns {Promise<string|null>} URL del avatar o null si no tiene
  */
 export async function getENSAvatar(ensName) {
   try {
+    // Si es una dirección, no podemos obtener avatar directamente
+    if (/^0x[a-fA-F0-9]{40}$/.test(ensName)) {
+      console.log(`[ENS Service] Input es una dirección, no se puede obtener avatar directo`);
+      return null;
+    }
+
     const normalizedENS = ensName.toLowerCase().endsWith('.eth') 
       ? ensName.toLowerCase() 
       : `${ensName.toLowerCase()}.eth`;

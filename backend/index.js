@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { validateENSLogin } from './services/ensValidator.js';
 import { createOrGetUser, getUserByENS } from './services/userService.js';
 import { getETHBalance, getENSAvatar, getBalanceInUSD } from './services/ensService.js';
+import { resolveENSFromAddress, isEthereumAddress } from './services/ensResolver.js';
 
 dotenv.config();
 
@@ -332,11 +333,35 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: validation.error });
     }
 
+    // Intentar resolver ENS si aún no lo tenemos o si es una dirección
+    let finalENSName = ensName;
+    if (!ensName || isEthereumAddress(ensName)) {
+      console.log(`[ENS Login] Intentando resolver ENS desde dirección: ${validation.address}`);
+      const resolved = await resolveENSFromAddress(validation.address);
+      if (resolved) {
+        finalENSName = resolved;
+        console.log(`[ENS Login] ✅ ENS resuelto: ${finalENSName}`);
+      } else {
+        // Si no hay ENS, usar la dirección como fallback pero marcada
+        console.log(`[ENS Login] ⚠️ No hay ENS asociado. Usando dirección: ${validation.address}`);
+        finalENSName = validation.address;
+      }
+    }
+
+    // Normalizar ENS name si es válido
+    if (finalENSName && !isEthereumAddress(finalENSName)) {
+      if (!finalENSName.toLowerCase().endsWith('.eth')) {
+        finalENSName = `${finalENSName.toLowerCase()}.eth`;
+      } else {
+        finalENSName = finalENSName.toLowerCase();
+      }
+    }
+
     // Crear o obtener usuario
     let user;
     try {
       console.log(`[ENS Login] Creando/obteniendo usuario...`);
-      user = await createOrGetUser(ensName, validation.address);
+      user = await createOrGetUser(finalENSName, validation.address);
       console.log(`[ENS Login] Usuario:`, { id: user.id, ensName: user.ensName, address: user.address });
     } catch (userError) {
       console.error(`[ENS Login] ❌ Error creando/obteniendo usuario:`, userError);
@@ -365,8 +390,14 @@ app.post('/api/auth/ens-login', authLimiter, async (req, res) => {
     }
 
     try {
-      avatar = await getENSAvatar(ensName);
-      console.log(`[ENS Login] Avatar: ${avatar || 'No disponible'}`);
+      // Solo intentar obtener avatar si tenemos un ENS name válido (no una dirección)
+      if (user.ensName && !isEthereumAddress(user.ensName)) {
+        avatar = await getENSAvatar(user.ensName);
+        console.log(`[ENS Login] Avatar: ${avatar || 'No disponible'}`);
+      } else {
+        console.log(`[ENS Login] ⚠️ No hay ENS name válido para obtener avatar`);
+        avatar = null;
+      }
     } catch (avatarError) {
       console.error(`[ENS Login] ⚠️ Error obteniendo avatar:`, avatarError.message);
       // Continuar sin avatar
@@ -467,6 +498,24 @@ app.get('/api/auth/verify', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    // Si el user.ensName es una dirección, intentar resolver el ENS real
+    let finalENSName = user.ensName;
+    if (isEthereumAddress(user.ensName)) {
+      console.log(`[Verify] ensName es una dirección, intentando resolver ENS desde: ${user.address}`);
+      const resolved = await resolveENSFromAddress(user.address);
+      if (resolved) {
+        finalENSName = resolved;
+        console.log(`[Verify] ✅ ENS resuelto: ${finalENSName}`);
+        // Actualizar el usuario con el ENS resuelto si es diferente
+        if (user.ensName !== finalENSName) {
+          user.ensName = finalENSName;
+          console.log(`[Verify] Usuario actualizado con ENS resuelto`);
+        }
+      } else {
+        console.log(`[Verify] ⚠️ No se pudo resolver ENS, usando dirección: ${user.ensName}`);
+      }
+    }
+
     // Obtener información actualizada: balance y avatar
     let ethBalance = '0.0';
     let balanceUSD = 0;
@@ -480,16 +529,23 @@ app.get('/api/auth/verify', async (req, res) => {
     }
 
     try {
-      avatar = await getENSAvatar(user.ensName);
+      // Usar el ENS resuelto para obtener el avatar
+      if (finalENSName && !isEthereumAddress(finalENSName)) {
+        avatar = await getENSAvatar(finalENSName);
+      } else {
+        console.log(`[Verify] ⚠️ No hay ENS válido para obtener avatar`);
+        avatar = null;
+      }
     } catch (error) {
       console.error(`[Verify] Error obteniendo avatar:`, error.message);
+      avatar = null;
     }
 
     res.json({
       valid: true,
       user: {
         id: user.id,
-        ensName: user.ensName,      // Nombre ENS siempre incluido
+        ensName: finalENSName,      // Nombre ENS real (resuelto si era dirección)
         address: user.address,
         balance: ethBalance,
         balanceUSD: balanceUSD,
@@ -497,7 +553,7 @@ app.get('/api/auth/verify', async (req, res) => {
         createdAt: user.createdAt
       },
       // Campos destacados para fácil acceso
-      ensName: user.ensName,
+      ensName: finalENSName,        // Usar el ENS resuelto
       avatar: avatar || null
     });
 
