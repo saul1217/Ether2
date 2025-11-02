@@ -31,14 +31,13 @@ Un sistema de autenticación que permite a los usuarios iniciar sesión usando e
 - Una wallet de Ethereum (MetaMask, WalletConnect, etc.)
 - Un nombre ENS (opcional, pero recomendado)
 
-## 📤 ¿Quieres Compartir Este Módulo?
+## 🚀 Deploy del Backend como API
 
-Si quieres que alguien más use este módulo en su página web:
-- 🚀 **Opción más fácil**: `DEPLOY_API.md` - Expone tu backend como API pública
-- 📖 **Lee primero**: `COMO_COMPARTIR.md` - Guía de cómo compartir el proyecto
-- ⚡ **Para integración rápida**: `QUICK_START.md` - Empezar en 5 minutos
-- 📚 **Para integración completa**: `INTEGRATION.md` - Guía detallada
-- 🌐 **Usar API remota**: `API_DOCS.md` - Documentación de la API
+Si quieres desplegar el backend como API pública para que otras páginas web la usen:
+
+- ⚡ **Deploy rápido**: `backend/DEPLOY_RAPIDO.md` - Guía rápida de 5 minutos
+- 📚 **Deploy completo**: `docs/DEPLOY_API_PRODUCCION.md` - Guía detallada con todas las opciones
+- 🌐 **Usar API remota**: `docs/COMO_USAR_API_REMOTA.md` - Cómo integrar la API en otra página web
 
 ## 🌐 ¿Quieres Usar una API Remota?
 

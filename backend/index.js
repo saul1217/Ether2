@@ -32,8 +32,8 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Si no hay origins configurados o está vacío, permitir todos
-    if (allowedOrigins.length === 0 || !process.env.ALLOWED_ORIGINS) {
+    // Si no hay origins configurados, está vacío, o contiene '*', permitir todos
+    if (allowedOrigins.length === 0 || !process.env.ALLOWED_ORIGINS || allowedOrigins.includes('*')) {
       return callback(null, true);
     }
     
